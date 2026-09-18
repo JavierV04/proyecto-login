@@ -1,102 +1,202 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+"use client";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+import { useState } from "react";
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+export default function Page() {
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmarPassword, setConfirmarPassword] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [protectedData, setProtectedData] = useState("");
 
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMensaje("Cargando...");
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    // Si estamos registrando, validamos en el front también por velocidad
+    if (isRegistering && password !== confirmarPassword) {
+      setMensaje("Error: Las contraseñas no coinciden");
+      return;
+    }
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
+    const endpoint = isRegistering ? "registro" : "login";
+
+    // Construimos el cuerpo de la petición dependiendo de la vista
+    const bodyData = isRegistering
+      ? { nombre, email, password, confirmar_password: confirmarPassword }
+      : { email, password };
+
+    try {
+      const res = await fetch(`http://localhost:8000/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Ocurrió un error");
+      }
+
+      if (isRegistering) {
+        setMensaje("¡Registrado con éxito! Ahora inicia sesión.");
+        setIsRegistering(false);
+        setPassword("");
+        setConfirmarPassword("");
+        setNombre("");
+      } else {
+        localStorage.setItem("token", data.access_token);
+        setIsLoggedIn(true);
+      }
+    } catch (err: any) {
+      setMensaje(err.message || "Error conectando con el servidor");
+    }
+  };
+
+  const probarRutaProtegida = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch("http://localhost:8000/me", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail);
+      setProtectedData(`Conectado como: ${data.email} (${data.estado})`);
+    } catch (err: any) {
+      setProtectedData("Error: " + err.message);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    setEmail("");
+    setPassword("");
+    setConfirmarPassword("");
+    setNombre("");
+    setMensaje("");
+    setProtectedData("");
+  };
+
+  if (isLoggedIn) {
+    return (
+      <main style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#0f172a", color: "#f8fafc", fontFamily: "sans-serif" }}>
+        <div style={{ background: "#1e293b", padding: "40px", borderRadius: "12px", width: "100%", maxWidth: "400px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.3)" }}>
+          <h1 style={{ fontSize: "24px", marginBottom: "10px" }}>¡Bienvenido, estás dentro! 🎉</h1>
+          <p style={{ color: "#94a3b8", marginBottom: "20px" }}>Tu sesión está activa y protegida con JWT.</p>
+
+          <button
+            onClick={probarRutaProtegida}
+            style={{ width: "100%", padding: "12px", background: "#3b82f6", color: "white", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginBottom: "15px" }}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
+            Probar Ruta Protegida (/me)
+          </button>
+
+          {protectedData && <p style={{ fontSize: "14px", color: "#38bdf8", marginBottom: "15px" }}>{protectedData}</p>}
+
+          <button
+            onClick={handleLogout}
+            style={{ width: "100%", padding: "12px", background: "#ef4444", color: "white", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
           >
-            Read our docs
-          </a>
+            Cerrar Sesión
+          </button>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
+    );
+  }
+
+  return (
+    <main style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#0f172a", color: "#f8fafc", fontFamily: "sans-serif" }}>
+      <div style={{ background: "#1e293b", padding: "40px", borderRadius: "12px", width: "100%", maxWidth: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.3)" }}>
+        <h1 style={{ textAlign: "center", marginBottom: "24px", fontSize: "24px" }}>
+          {isRegistering ? "Crear Cuenta" : "Iniciar Sesión"}
+        </h1>
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* Campo Nombre (Solo aparece al registrarse) */}
+          {isRegistering && (
+            <div>
+              <label style={{ display: "block", fontSize: "14px", marginBottom: "6px", color: "#94a3b8" }}>Nombre completo</label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #334155", background: "#0f172a", color: "white", boxSizing: "border-box" }}
+              />
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: "block", fontSize: "14px", marginBottom: "6px", color: "#94a3b8" }}>Correo electrónico</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #334155", background: "#0f172a", color: "white", boxSizing: "border-box" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "14px", marginBottom: "6px", color: "#94a3b8" }}>Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #334155", background: "#0f172a", color: "white", boxSizing: "border-box" }}
+            />
+          </div>
+
+          {/* Campo Confirmar Contraseña (Solo aparece al registrarse) */}
+          {isRegistering && (
+            <div>
+              <label style={{ display: "block", fontSize: "14px", marginBottom: "6px", color: "#94a3b8" }}>Confirmar contraseña</label>
+              <input
+                type="password"
+                value={confirmarPassword}
+                onChange={(e) => setConfirmarPassword(e.target.value)}
+                required
+                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #334155", background: "#0f172a", color: "white", boxSizing: "border-box" }}
+              />
+            </div>
+          )}
+
+          <button
+            type="submit"
+            style={{ padding: "12px", background: "#22c55e", color: "white", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}
+          >
+            {isRegistering ? "Registrarse" : "Entrar"}
+          </button>
+        </form>
+
+        {mensaje && (
+          <p style={{ textAlign: "center", marginTop: "16px", fontSize: "14px", color: mensaje.includes("éxito") ? "#4ade80" : "#f87171" }}>
+            {mensaje}
+          </p>
+        )}
+
+        <p style={{ textAlign: "center", marginTop: "20px", fontSize: "14px", color: "#94a3b8" }}>
+          {isRegistering ? "¿Ya tienes una cuenta?" : "¿No tienes cuenta?"}{" "}
+          <span
+            onClick={() => { setIsRegistering(!isRegistering); setMensaje(""); }}
+            style={{ color: "#38bdf8", cursor: "pointer", textDecoration: "underline" }}
+          >
+            {isRegistering ? "Inicia sesión aquí" : "Regístrate aquí"}
+          </span>
+        </p>
+      </div>
+    </main>
   );
 }

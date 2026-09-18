@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_login
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: tu_password
+      POSTGRES_DB: login_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # Esto es lo que evita que se borren los usuarios al apagar Docker
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+  # Para entrar en la db y hacer consultas ejecutar el siguiente comando en la terminal
+  # docker exec -it postgres_login psql -U admin -d logindb 

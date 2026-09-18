@@ -1,0 +1,7 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "venv\\Scripts\\python.exe -m fastapi dev main.py"
+  }
+}
